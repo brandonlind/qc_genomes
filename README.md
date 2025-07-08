@@ -1,8 +1,8 @@
 help documentation as of 
 
-commit 4f1f359aeff34cfc6db9cb6c278a034a46835e64  
+commit f2afd8ccfb70d3b698599e7a6782dacb1e1833d7  
 Author: Brandon Lind <lind.brandon.m@gmail.com>  
-Date:   Tue Jul 8 11:45:43 2025 -0400
+Date:   Tue Jul 8 18:09:52 2025 -0400
 
 ----
 ### Python Library Documentation: module qc_genomes
@@ -55,6 +55,11 @@ FUNCTIONS
             the NanoPlot output files that end with `_NanoStats.txt`. Note underscore is assumed.
         genome_size : int | float
             the size of the genome in base-pairs; to be used to calculate coverage - see Notes
+
+        Returns
+        -------
+        pd.DataFrame
+            index = nano plot metrics, columns = names inferred from basenames of `statfiles`
 
         Notes
         -----
