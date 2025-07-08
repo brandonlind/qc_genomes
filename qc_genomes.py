@@ -185,6 +185,11 @@ def nanoplot_stats(statfiles, genome_size=None):
     genome_size : int | float
         the size of the genome in base-pairs; to be used to calculate coverage - see Notes
 
+    Returns
+    -------
+    pd.DataFrame
+        index = nano plot metrics, columns = names inferred from basenames of `statfiles`
+
     Notes
     -----
     coverage is calculated across all files provide (assumed to go towards a single assembly)
