@@ -1,8 +1,12 @@
 """Get QC information from various outputs."""
 import pandas as pd
-from collections import defaultdict
-from collections import Counter
+from tqdm import tqdm
 from os import path as op
+from functools import partial
+import matplotlib.pyplot as plt
+from collections import defaultdict, Counter
+from matplotlib.backends.backend_pdf import PdfPages
+pbar = partial(tqdm, bar_format='{l_bar}{bar:15}{r_bar}')
 
 perc_keys = {
     # BUSCO and compleasm
@@ -175,7 +179,7 @@ def quast(report, quast_data=None, name=None):
     return quast_data
 
 
-def nanoplot_stats(statfiles, genome_size=None):
+def nanoplot_stats(statfiles, genome_size=None, verbose=True):
     """Parse NanoStats file from NanoPlot output.
     
     Parameters
@@ -226,22 +230,117 @@ def nanoplot_stats(statfiles, genome_size=None):
     
         df.reset_index(drop=False)
         df.dataset = df.dataset.apply(lambda entry: "%s %s" % (f'{float(entry.split()[0]):,}', ' '.join(entry.split()[1:])))
-        print(f'\n**{name} (n50 = %s)**\n' % data['n50'])
-        print(df.to_markdown())
+        if verbose is True:
+            print(f'\n**{name} (n50 = %s)**\n' % data['n50'])
+            print(df.to_markdown())
         df.columns = ['Metrics', name]
         dfs.append(df.set_index('Metrics'))
 
-    if print_read_info is True:
+    if print_read_info is True and verbose is True:
         print('\n**read info**\n')
         print(pd.DataFrame(read_info).to_markdown())
 
-    print(f'\n{total_reads = :,}')
-    print(f'{total_bases = :,}')
+    if verbose is True:
+        print(f'\n{total_reads = :,}')
+        print(f'{total_bases = :,}')
 
-    if genome_size is not None:
+    if genome_size is not None and verbose is True:
         print(f'coverage = ', round(total_bases / genome_size, 2))
 
     return pd.concat(dfs, axis=1)
+
+
+def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_size=None, pdf_path=None, verbose=True):
+    """Plot data output from NanoPlot output, assuming sequential QC order specified in `statfiles`.
+
+    Parameters
+    ----------
+    statfiles : list
+        a list of the paths to NanoStats.txt files. The order of the list is the assumed to be the
+        order the dataset went through sequential QC steps - eg first lenght-filtering, then 
+        rebasecalling, centrifuge, etc
+    statnames : list
+        names for each file in statfiles - used to label x-axis labels in figure
+    dataset_name : str
+        the name of the dataset pertaining to the statfiles - for labeling the figure
+    genome_size : int
+        if provided, `nanoplot_traceplots` will calculage and plot coverage changes
+    pdf_path : str
+        if provide, the path where the figure will be saved
+    verbose : bool
+        if True, markdown-formatted tables from each of the `statfiles` will be printed along with
+        other information
+
+    Returns
+    -------
+    stats : pandas.DataFrame
+        index = metrics, cols = statnames (or if statnames not provided, Step numbers are assigned)
+    """
+    
+    metrics = ['number_of_reads', 'number_of_bases', 'median_read_length', 'read_length_stdev', 'n50']
+
+    if statnames is None:
+        statnames = [f'Step {x}' for x in list(range(len(statfiles)))]
+
+    # create a dataframe with `metrics` as index and `statnames` as columns
+    stats = pd.DataFrame(index=metrics)
+    for name, statfile in zip(pbar(statnames), statfiles):
+        if verbose is True:
+            print(f'\033[4m\033[1m{name}\033[0m')  # bold underline
+            print(' ', statfile)
+
+        df = nanoplot_stats(statfile, verbose=verbose)
+
+        # add each metric into dataframe where col is one of the `statnames` and index is the `metric`
+        for metric in metrics:
+            stats.loc[metric, name] = df.loc[metric, df.columns[0]].replace(',', '')
+
+    stats = stats.astype(float).astype(int)
+
+    # add in percentages of the original (first step or stepfile)
+    for i, perc_metric in enumerate(['number_of_reads', 'number_of_bases', 'median_read_length']):
+        stats.loc[f'percent of original\n{perc_metric}'] = stats.loc[perc_metric] / stats.loc[perc_metric].iloc[0]
+        metrics.insert(i+3, f'percent of original\n{perc_metric}')
+
+    if genome_size is not None:
+        stats.loc['coverage'] = stats.loc['number_of_bases'] / genome_size
+        metrics.append('coverage')
+
+    # create lineplot figure with values of metrics for y-axis and `statnames` for x-axis labels
+    fig, axes = plt.subplots(ncols=3, nrows=3, sharex=False, sharey=False, figsize=(15, 12))
+    for metric, ax in zip(metrics, axes.flat):
+        ax.plot(stats.loc[metric], marker='o', linestyle='-')
+        ax.set_title(metric)
+
+    fig.suptitle(dataset_name, fontsize=18)
+
+    if len(stats.columns) > 4:
+        for ax in axes.flat:
+            plt.setp(ax.get_xticklabels(), rotation=45, ha='center')
+
+    # if genome_size not provided, remove empty figure
+    if genome_size is None:
+        last_ax = axes.flat[-1]
+        for spine in last_ax.spines.values():
+            spine.set_visible(False)
+        
+        last_ax.set_xticks([])
+        last_ax.set_yticks([])
+        last_ax.set_xlabel('')
+        last_ax.set_ylabel('')
+        last_ax.set_title('')
+    
+    plt.tight_layout()
+
+    # save
+    if pdf_path is not None:
+        with PdfPages(pdf_path) as pdf:
+            pdf.savefig(bbox_inches="tight")
+        print(f'\033[1mSaved to\033[0m: ', pdf_path)  # bold
+        
+    plt.show()
+    
+    return stats
 
 if __name__ == '__main__':
     pass
