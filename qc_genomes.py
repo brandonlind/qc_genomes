@@ -289,7 +289,7 @@ def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_siz
             print(f'\033[4m\033[1m{name}\033[0m')  # bold underline
             print(' ', statfile)
 
-        df = nanoplot_stats(statfile, verbose=verbose)
+        df = nanoplot_stats(statfile, verbose=verbose, genome_size=genome_size)
 
         # add each metric into dataframe where col is one of the `statnames` and index is the `metric`
         for metric in metrics:
