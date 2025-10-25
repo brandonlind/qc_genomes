@@ -250,7 +250,7 @@ def nanoplot_stats(statfiles, genome_size=None, verbose=True):
     return pd.concat(dfs, axis=1)
 
 
-def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_size=None, pdf_path=None, verbose=True):
+def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_size=None, pdf_path=None, png_path=None, verbose=True):
     """Plot data output from NanoPlot output, assuming sequential QC order specified in `statfiles`.
 
     Parameters
@@ -266,7 +266,9 @@ def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_siz
     genome_size : int
         if provided, `nanoplot_traceplots` will calculage and plot coverage changes
     pdf_path : str
-        if provide, the path where the figure will be saved
+        if provided, the .pdf path where the figure will be saved
+    png_path : str
+        if provided, the .png path were the figure will be saved
     verbose : bool
         if True, markdown-formatted tables from each of the `statfiles` will be printed along with
         other information
@@ -299,7 +301,7 @@ def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_siz
 
     # add in percentages of the original (first step or stepfile)
     for i, perc_metric in enumerate(['number_of_reads', 'number_of_bases', 'median_read_length']):
-        stats.loc[f'percent of original\n{perc_metric}'] = stats.loc[perc_metric] / stats.loc[perc_metric].iloc[0]
+        stats.loc[f'percent of original\n{perc_metric}'] = 100 * (stats.loc[perc_metric] / stats.loc[perc_metric].iloc[0])
         metrics.insert(i+3, f'percent of original\n{perc_metric}')
 
     if genome_size is not None:
@@ -337,8 +339,14 @@ def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_siz
         with PdfPages(pdf_path) as pdf:
             pdf.savefig(bbox_inches="tight")
         print(f'\033[1mSaved to\033[0m: ', pdf_path)  # bold
+    if png_path is not None:
+        plt.savefig(png_path, dpi=300, bbox_inches='tight')
+        print(f'\033[1mSaved to\033[0m: ', png_path)
         
     plt.show()
+
+    if dataset_name is not None:
+        stats.columns = pd.MultiIndex.from_tuples([[dataset_name, col] for col in stats.columns])
     
     return stats
 
