@@ -278,8 +278,9 @@ def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_siz
     stats : pandas.DataFrame
         index = metrics, cols = statnames (or if statnames not provided, Step numbers are assigned)
     """
-    
+
     metrics = ['number_of_reads', 'number_of_bases', 'median_read_length', 'read_length_stdev', 'n50']
+    metric_names = ['number_of_reads', 'number_of_bases', 'median_read_length', 'read_length_stdev', 'n50']
 
     if statnames is None:
         statnames = [f'Step {x}' for x in list(range(len(statfiles)))]
@@ -301,18 +302,21 @@ def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_siz
 
     # add in percentages of the original (first step or stepfile)
     for i, perc_metric in enumerate(['number_of_reads', 'number_of_bases', 'median_read_length']):
-        stats.loc[f'percent of original\n{perc_metric}'] = 100 * (stats.loc[perc_metric] / stats.loc[perc_metric].iloc[0])
-        metrics.insert(i+3, f'percent of original\n{perc_metric}')
+        idx = f'percent_of_original-{perc_metric}'
+        stats.loc[idx] = 100 * (stats.loc[perc_metric] / stats.loc[perc_metric].iloc[0])
+        metrics.insert(i+3, idx)
+        metric_names.insert(i+3, f'percent of original\n{perc_metric}')
 
     if genome_size is not None:
         stats.loc['coverage'] = stats.loc['number_of_bases'] / genome_size
         metrics.append('coverage')
+        metric_names.append('coverage')
 
     # create lineplot figure with values of metrics for y-axis and `statnames` for x-axis labels
     fig, axes = plt.subplots(ncols=3, nrows=3, sharex=False, sharey=False, figsize=(15, 12))
-    for metric, ax in zip(metrics, axes.flat):
+    for metric, metric_name, ax in zip(metrics, metric_names, axes.flat):
         ax.plot(stats.loc[metric], marker='o', linestyle='-')
-        ax.set_title(metric)
+        ax.set_title(metric_name)
 
     fig.suptitle(dataset_name, fontsize=18)
 
@@ -348,7 +352,7 @@ def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_siz
     if dataset_name is not None:
         stats.columns = pd.MultiIndex.from_tuples([[dataset_name, col] for col in stats.columns])
     
-    return stats
+    return stats.map(lambda x: f"{x:,.1f}")
 
 if __name__ == '__main__':
     pass
