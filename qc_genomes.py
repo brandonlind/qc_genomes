@@ -2,6 +2,7 @@
 import pandas as pd
 from tqdm import tqdm
 from os import path as op
+import os
 from functools import partial
 import matplotlib.pyplot as plt
 from collections import defaultdict, Counter
@@ -21,6 +22,19 @@ perc_keys = {
     'I' : 'Intermediate',
     'N' : 'total'
 }
+
+def makedir(directory: str, real=False) -> str:
+    """If directory doesn't exist, create it.
+
+    Return directory.
+    """
+    os.makedirs(directory, exist_ok=True)
+
+    if real is True:
+        directory = op.realpath(directory)
+    
+    return directory
+
 
 def read(file: str, lines=True, ignore_blank=False):
     """Read lines from a file.
@@ -88,6 +102,76 @@ def busco(short_summary, busco_data=None, name=None):
     return busco_data
 
 
+def write_compleasm(name, compdir, fasta, odbs=['eudicotyledons_odb12', 'viridiplantae_odb12', 'embryophyta_odb12'],
+                    lib_path='/home/FCAM/blind/src/compleasm_dbs/mb_downloads', threads=32):
+    """Write slurm.sh files to run compleasm on the `fasta` for all `odbs`.
+    
+    Parameters
+    ----------
+    name : str
+        name used to create job name, output directories etc
+    compdir : str | Path
+        directory for outputs
+    fasta : str | Path
+        path to input fasta
+    odbs : list
+        list of odbs to use with compleasm (assumed to be in `lib_path`)
+    lib_path : str | Path
+        path to compleasm dbs
+    threads : int
+        number of threads to use
+
+    Returns
+    -------
+    shfiles : list
+        list of slurm.sh files to sbatch
+    """
+    shdir = makedir(op.abspath(f'{compdir}/../shfiles'))
+
+    shfiles = []
+    for odb in odbs:
+        assert op.exists(f'{lib_path}/{odb}')
+
+        outputdir = makedir(f'{compdir}/{name}_{odb}')
+
+        job = f'{name}_{odb}_compleasm'
+        
+        text = f'''#!/bin/bash
+#SBATCH --job-name={job}
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task={threads}
+#SBATCH --mem=30G
+#SBATCH --partition=general
+#SBATCH --qos=general
+#SBATCH -o %x_%j.out
+
+hostname
+date
+
+source $HOME/conda_init.sh
+conda activate compleasm_0_2_7
+
+cd {outputdir}
+
+compleasm run \\
+--assembly_path {fasta} \\
+--output_dir {outputdir} \\
+--lineage {odb} \\
+--library_path {lib_path} \\
+--threads {threads}
+
+date
+
+'''
+        shfile = f'{shdir}/{job}.sh'
+        with open(shfile, 'w') as o:
+            o.write(text)
+    
+        shfiles.append(shfile)
+
+    return shfiles
+
+
 def compleasm(summary_file, compleasm_data=None, name=None):
     """Parse the summary_file output from compleasm.
 
@@ -137,6 +221,58 @@ def compleasm(summary_file, compleasm_data=None, name=None):
 
     return compleasm_data.loc[idx]
 
+
+def write_quast(name, quastdir, fasta, threads=16):
+    """Write slurm.sh files to run quast on the `fasta`.
+
+    Parameters
+    ----------
+    name : str
+        name used to create job name, output directories etc
+    quastdir : str | Path
+        directory for outputs
+    fasta : str | Path
+        path to input fasta
+    threads : int
+        number of threads to use
+
+    Returns
+    -------
+    shfile : str 
+        path to slurm.sh file to sbatch
+    """
+    outputdir = makedir(f'{quastdir}/{name}')
+    shdir = makedir(op.abspath(f'{quastdir}/../shfiles'))
+
+    job = f'{name}_quast'
+
+    text = f'''#!/bin/bash
+#SBATCH --job-name={job}
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task={threads}
+#SBATCH --mem=5G
+#SBATCH --partition=general
+#SBATCH --qos=general
+#SBATCH -o %x_%j.out
+
+hostname
+date
+
+module load quast/5.2.0
+
+cd {outputdir}
+
+quast.py {fasta} \\
+--threads {threads} \\
+--output-dir {outputdir}
+
+'''
+    shfile = f'{shdir}/{job}.sh'
+    with open(shfile, 'w') as o:
+        o.write(text)
+
+    return shfile
+    
 
 def quast(report, quast_data=None, name=None):
     """Parse the report.tsv output from quast.
