@@ -102,7 +102,7 @@ def busco(short_summary, busco_data=None, name=None):
     return busco_data
 
 
-def write_compleasm(name, compdir, fasta, odbs=['eudicotyledons_odb12', 'viridiplantae_odb12', 'embryophyta_odb12'],
+def write_compleasm(name, compdir, fasta, mem='30G', odbs=['eudicotyledons_odb12', 'viridiplantae_odb12', 'embryophyta_odb12'],
                     lib_path='/home/FCAM/blind/src/compleasm_dbs/mb_downloads', threads=32):
     """Write slurm.sh files to run compleasm on the `fasta` for all `odbs`.
     
@@ -140,7 +140,7 @@ def write_compleasm(name, compdir, fasta, odbs=['eudicotyledons_odb12', 'viridip
 #SBATCH --job-name={job}
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={threads}
-#SBATCH --mem=30G
+#SBATCH --mem={mem}
 #SBATCH --partition=general
 #SBATCH --qos=general
 #SBATCH -o %x_%j.out
@@ -222,7 +222,7 @@ def compleasm(summary_file, compleasm_data=None, name=None):
     return compleasm_data.loc[idx]
 
 
-def write_quast(name, quastdir, fasta, threads=16):
+def write_quast(name, quastdir, fasta, mem='50G', threads=16):
     """Write slurm.sh files to run quast on the `fasta`.
 
     Parameters
@@ -250,7 +250,7 @@ def write_quast(name, quastdir, fasta, threads=16):
 #SBATCH --job-name={job}
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={threads}
-#SBATCH --mem=5G
+#SBATCH --mem={mem}
 #SBATCH --partition=general
 #SBATCH --qos=general
 #SBATCH -o %x_%j.out
