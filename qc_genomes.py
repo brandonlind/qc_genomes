@@ -7,6 +7,8 @@ from functools import partial
 import matplotlib.pyplot as plt
 from collections import defaultdict, Counter
 from matplotlib.backends.backend_pdf import PdfPages
+from dataclasses import dataclass
+import subprocess
 pbar = partial(tqdm, bar_format='{l_bar}{bar:15}{r_bar}')
 
 perc_keys = {
@@ -102,7 +104,8 @@ def busco(short_summary, busco_data=None, name=None):
     return busco_data
 
 
-def write_compleasm(name, compdir, fasta, mem='30G', odbs=['eudicotyledons_odb12', 'viridiplantae_odb12', 'embryophyta_odb12'],
+def write_compleasm(name, compdir, fasta, shdir=None,
+                    mem='30G', odbs=['eudicotyledons_odb12', 'viridiplantae_odb12', 'embryophyta_odb12'],
                     lib_path='/home/FCAM/blind/src/compleasm_dbs/mb_downloads', threads=32):
     """Write slurm.sh files to run compleasm on the `fasta` for all `odbs`.
     
@@ -126,7 +129,8 @@ def write_compleasm(name, compdir, fasta, mem='30G', odbs=['eudicotyledons_odb12
     shfiles : list
         list of slurm.sh files to sbatch
     """
-    shdir = makedir(op.abspath(f'{compdir}/../shfiles'))
+    if shdir is None:
+        shdir = makedir(op.abspath(f'{compdir}/../shfiles'))
 
     shfiles = []
     for odb in odbs:
@@ -222,7 +226,7 @@ def compleasm(summary_file, compleasm_data=None, name=None):
     return compleasm_data.loc[idx]
 
 
-def write_quast(name, quastdir, fasta, mem='50G', threads=16):
+def write_quast(name, quastdir, fasta, outputdir=None, shdir=None, mem='50G', threads=16):
     """Write slurm.sh files to run quast on the `fasta`.
 
     Parameters
@@ -241,8 +245,10 @@ def write_quast(name, quastdir, fasta, mem='50G', threads=16):
     shfile : str 
         path to slurm.sh file to sbatch
     """
-    outputdir = makedir(f'{quastdir}/{name}')
-    shdir = makedir(op.abspath(f'{quastdir}/../shfiles'))
+    if outputdir is None:
+        outputdir = makedir(f'{quastdir}/{name}')
+    if shdir is None:
+        shdir = makedir(op.abspath(f'{quastdir}/../shfiles'))
 
     job = f'{name}_quast'
 
@@ -489,6 +495,42 @@ def nanoplot_traceplots(statfiles, statnames=None, dataset_name=None, genome_siz
         stats.columns = pd.MultiIndex.from_tuples([[dataset_name, col] for col in stats.columns])
     
     return stats.map(lambda x: f"{x:,.1f}")
+
+
+@dataclass
+class QC_config:
+    seqkit = '/home/FCAM/blind/anaconda3/envs/seqkit/bin/seqkit'
+
+
+def create_lenfile(fasta, suffix='.length', cmd_only=False):
+    """Create a two-column file with contig/scaffold name and its length.
+    
+    Parameters
+    ----------
+    fasta : str | Path
+        path to .fasta (or .fa or .fna)
+    suffix : str
+        suffix for `fasta` to replace file suffix (eg .fasta, .fa, .fna)
+    cmd_only : bool
+        if True, return seqkit command, else run seqkit command and return subprocess output
+    """
+    seqkit = QC_config.seqkit
+
+    lenfile = '.'.join(fasta.split('.')[:-1]) + suffix
+
+    command = f'{seqkit} fx2tab -n -l {fasta} > {lenfile}'
+
+    if cmd_only is False:
+        output = subprocess.run(
+            command,
+            check=True,
+            shell=True,
+            text=True
+        )
+    else:
+        output = command
+
+    return output
 
 if __name__ == '__main__':
     pass
