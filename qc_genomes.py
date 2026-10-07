@@ -9,6 +9,7 @@ from collections import defaultdict, Counter
 from matplotlib.backends.backend_pdf import PdfPages
 from dataclasses import dataclass
 import subprocess
+from pathlib import Path
 pbar = partial(tqdm, bar_format='{l_bar}{bar:15}{r_bar}')
 
 perc_keys = {
@@ -531,6 +532,43 @@ def create_lenfile(fasta, suffix='.length', cmd_only=False):
         output = command
 
     return output
+
+def reduce_fasta_longest_chroms(fasta, num_chroms, outdir=None, cmd_only=False):
+    """Subset a fasta to the top `num_chroms` longest records.
+    
+    Parameters
+    ----------
+    fasta : str | Path
+        path to .fasta (or .fa or .fna)
+    num_chroms : int
+        subset the longest `num_chroms` chromosomes for output
+    outdir : str | Path
+        the output directory, if None output is in same dir as fasta
+    cmd_only : bool
+        if True, return seqkit command, else run seqkit command and return subprocess output
+    """
+    seqkit = QC_config.seqkit
+
+    fasta = Path(fasta)
+
+    if outdir is None:
+        outdir = op.dirname(fasta)
+
+    reduced_fasta = f'{outdir}/%s' % op.basename(fasta).removesuffix(fasta.suffix) + f'_{num_chroms}CHROMS' + fasta.suffix
+
+    command = f'{seqkit} sort --by-length --reverse {fasta} | {seqkit} head -n {num_chroms} > {reduced_fasta}'
+
+    if cmd_only is False:
+        output = subprocess.run(
+            command,
+            check=True,
+            shell=True,
+            text=True
+        )
+    else:
+        return command
+
+    return reduced_fasta
 
 if __name__ == '__main__':
     pass
